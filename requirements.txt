@@ -1,7 +1,7 @@
-Flask==2.0.3
-Werkzeug==2.0.3
+Flask==3.0.0
 yfinance==0.2.28
-APScheduler==3.9.1
-requests
-pandas
-numpy
+APScheduler==3.10.4
+pandas==2.1.4
+numpy==1.26.2
+requests==2.31.0
+
