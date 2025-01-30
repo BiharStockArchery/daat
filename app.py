@@ -1,86 +1,83 @@
 import os
-from flask import Flask, jsonify
 import yfinance as yf
+from flask import Flask, jsonify
 from apscheduler.schedulers.background import BackgroundScheduler
-from threading import Lock
 
+# Define your Flask app
 app = Flask(__name__)
 
-# List of all stocks
+# Define your global variable to store the stock data
+stock_data = {}  # Store fetched stock data globally
+
+# List of all stocks (your list of stocks remains unchanged)
 all_stocks = [
     "AXISBANK.NS", "AUBANK.NS", "BANDHANBNK.NS", "BANKBARODA.NS", "BANKINDIA.NS",
-    "CANBK.NS", "CUB.NS", "FEDERALBNK.NS", "HDFCBANK.NS", "ICICIBANK.NS",
-    "IDFCFIRSTB.NS", "INDUSINDBK.NS", "KOTAKBANK.NS", "PNB.NS", "RBLBANK.NS",
-    "SBIN.NS", "YESBANK.NS", "ABCAPITAL.NS", "ANGELONE.NS", "BAJFINANCE.NS",
-    "BAJAJFINSV.NS", "CANFINHOME.NS", "CHOLAFIN.NS", "HDFCAMC.NS", "HDFCLIFE.NS",
-    "ICICIGI.NS", "ICICIPRULI.NS", "LICIHSGFIN.NS", "M&MFIN.NS", "MANAPPURAM.NS",
-    "MUTHOOTFIN.NS", "PEL.NS", "PFC.NS", "POONAWALLA.NS", "RECLTD.NS", "SBICARD.NS",
-    "SBILIFE.NS", "SHRIRAMFIN.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "BPCL.NS",
-    "GAIL.NS", "GUJGASLTD.NS", "IGL.NS", "IOC.NS", "MGL.NS", "NTPC.NS", "OIL.NS",
-    "ONGC.NS", "PETRONET.NS", "POWERGRID.NS", "RELIANCE.NS", "SJVN.NS", "TATAPOWER.NS"
+    "CANBK.NS", "CUB.NS", "FEDERALBNK.NS", "HDFCBANK.NS", "ICICIBANK.NS", "IDFCFIRSTB.NS",
+    "INDUSINDBK.NS", "KOTAKBANK.NS", "PNB.NS", "RBLBANK.NS", "SBIN.NS", "YESBANK.NS",
+    "ABCAPITAL.NS", "ANGELONE.NS", "BAJFINANCE.NS", "BAJAJFINSV.NS", "CANFINHOME.NS",
+    "CHOLAFIN.NS", "HDFCAMC.NS", "HDFCLIFE.NS", "ICICIGI.NS", "ICICIPRULI.NS", "LICIHSGFIN.NS",
+    "M&MFIN.NS", "MANAPPURAM.NS", "MUTHOOTFIN.NS", "PEL.NS", "PFC.NS", "POONAWALLA.NS",
+    "RECLTD.NS", "SBICARD.NS", "SBILIFE.NS", "SHRIRAMFIN.NS", "ADANIGREEN.NS", "ADANIPORTS.NS",
+    "BPCL.NS", "GAIL.NS", "GUJGASLTD.NS", "IGL.NS", "IOC.NS", "MGL.NS", "NTPC.NS", "OIL.NS",
+    "ONGC.NS", "PETRONET.NS", "POWERGRID.NS", "RELIANCE.NS", "SJVN.NS", "TATAPOWER.NS",
+    "ADANIENSOL.NS", "NHPC.NS", "NTPC.NS", "POWERGRID.NS", "SJVN.NS", "TATAPOWER.NS",
+    "ACC.NS", "AMBUJACEM.NS", "DALBHARAT.NS", "JKCEMENT.NS", "RAMCOCEM.NS", "SHREECEM.NS",
+    "ULTRACEMCO.NS", "APLAPOLLO.NS", "HINDALCO.NS", "HINDCOPPER.NS", "JINDALSTEL.NS", "JSWSTEEL.NS",
+    "NATIONALUM.NS", "NMDC.NS", "SAIL.NS", "TATASTEEL.NS", "VEDL.NS", "BSOFT.NS", "COFORGE.NS",
+    "CYIENT.NS", "INFY.NS", "LTIM.NS", "LTTS.NS", "MPHASIS.NS", "PERSISTENT.NS", "TATAELXSI.NS",
+    "TCS.NS", "TECHM.NS", "WIPRO.NS", "ASHOKLEY.NS", "BAJAJ-AUTO.NS", "BHARATFORG.NS", "EICHERMOT.NS",
+    "HEROMOTOCO.NS", "M&M.NS", "MARUTI.NS", "MOTHERSON.NS", "TATAMOTORS.NS", "TVSMOTOR.NS",
+    "ABFRL.NS", "DMART.NS", "NYKAA.NS", "PAGEIND.NS", "PAYTM.NS", "TRENT.NS", "VBL.NS", "ZOMATO.NS",
+    "ASIANPAINT.NS", "BERGEPAINT.NS", "BRITANNIA.NS", "COLPAL.NS", "DABUR.NS", "GODREJCP.NS", 
+    "HINDUNILVR.NS", "ITC.NS", "MARICO.NS", "NESTLEIND.NS", "TATACONSUM.NS", "UBL.NS", "UNITEDSPR.NS", 
+    "VOLTAS.NS", "ALKEM.NS", "APLLTD.NS", "AUROPHARMA.NS", "BIOCON.NS", "CIPLA.NS", "DIVISLAB.NS",
+    "DRREDDY.NS", "GLENMARK.NS", "GRANULES.NS", "LAURUSLABS.NS", "LUPIN.NS", "SUNPHARMA.NS",
+    "SYNGENE.NS", "TORNTPHARM.NS", "APOLLOHOSP.NS", "LALPATHLAB.NS", "MAXHEALTH.NS", "METROPOLIS.NS",
+    "BHARTIARTL.NS", "HFCL.NS", "IDEA.NS", "INDUSTOWER.NS", "DLF.NS", "GODREJPROP.NS", "LODHA.NS",
+    "OBEROIRLTY.NS", "PRESTIGE.NS", "GUJGASLTD.NS", "IGL.NS", "MGL.NS", "CONCOR.NS", "CESC.NS", 
+    "HUDCO.NS", "IRFC.NS", "ABBOTINDIA.NS", "BEL.NS", "CGPOWER.NS", "CUMMINSIND.NS", "HAL.NS", 
+    "L&T.NS", "SIEMENS.NS", "TIINDIA.NS", "CHAMBLFERT.NS", "COROMANDEL.NS", "GNFC.NS", "PIIND.NS", 
+    "BSE.NS", "DELHIVERY.NS", "GMRAIRPORT.NS", "IRCTC.NS", "KEI.NS", "NAVINFLUOR.NS", "POLYCAB.NS",
+    "SUNTV.NS", "UPL.NS"
 ]
 
-# Global dictionary to store stock data
-stock_cache = {}
-cache_lock = Lock()
+# Function to fetch stock data from Yahoo Finance
+def get_stock_data(stock_list):
+    stock_data = {}
+    for stock in stock_list:
+        try:
+            data = yf.Ticker(stock).history(period="1d")
+            stock_data[stock] = {
+                "current_price": data['Close'].iloc[-1],
+                "change": data['Close'].pct_change().iloc[-1] * 100  # percentage change
+            }
+        except Exception as e:
+            print(f"Error fetching data for {stock}: {e}")
+            stock_data[stock] = {"error": "Failed to fetch data"}
+    return stock_data
 
-# Function to fetch stock data from yfinance
-def fetch_stock_data():
-    global stock_cache
-    try:
-        # Use yf.download() for better efficiency (fetches all stocks in one request)
-        data = yf.download(all_stocks, period="5d", group_by="ticker")
-        new_stock_cache = {}
+# Background task to update stock data periodically
+def update_stock_data():
+    global stock_data
+    stock_data = get_stock_data(all_stocks)
+    print("Stock data updated!")
 
-        for stock in all_stocks:
-            try:
-                if stock in data and not data[stock].empty:
-                    previous_close = data[stock]['Close'].iloc[-2]  # 2nd last day close
-                    current_price = data[stock]['Close'].iloc[-1]  # Most recent close
-                    change = ((current_price - previous_close) / previous_close) * 100  # Percentage change
-
-                    new_stock_cache[stock] = {
-                        "current_price": round(current_price, 2),
-                        "previous_close": round(previous_close, 2),
-                        "change": round(change, 2)
-                    }
-            except Exception as e:
-                print(f"Error processing data for {stock}: {e}")
-
-        # Update stock cache with thread safety
-        with cache_lock:
-            stock_cache = new_stock_cache
-        print("Stock data updated.")
-
-    except Exception as e:
-        print(f"Error fetching stock data: {e}")
-
-# Scheduler to update stock data every 10 seconds
+# Initialize APScheduler to run the task periodically
 scheduler = BackgroundScheduler()
-scheduler.add_job(fetch_stock_data, 'interval', seconds=10)
+scheduler.add_job(update_stock_data, 'interval', seconds=10)
 scheduler.start()
 
-# API endpoint to get gainers
+# Flask route to fetch gainers
 @app.route('/gainers', methods=['GET'])
 def get_gainers():
-    with cache_lock:
-        gainers = {stock: data for stock, data in stock_cache.items() if data["change"] > 0}
-    return jsonify(gainers)
+    try:
+        # Filter gainers (stocks with positive change)
+        gainers = {stock: data for stock, data in stock_data.items() if "change" in data and data["change"] > 0}
+        return jsonify(gainers)
+    except Exception as e:
+        print(f"Error fetching gainers: {e}")
+        return jsonify({"error": "Failed to fetch gainers data"}), 500
 
-# API endpoint to get losers
-@app.route('/losers', methods=['GET'])
-def get_losers():
-    with cache_lock:
-        losers = {stock: data for stock, data in stock_cache.items() if data["change"] < 0}
-    return jsonify(losers)
-
-# API endpoint to get all stock data
-@app.route('/stocks', methods=['GET'])
-def get_all_stocks():
-    with cache_lock:
-        return jsonify(stock_cache)
-
-if __name__ == '__main__':
-    # Fetch initial stock data before starting the server
-    fetch_stock_data()
-    app.run(debug=True, use_reloader=False)
+if __name__ == "__main__":
+    # Ensure the app runs on the right host and port for Railway
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), debug=True)
