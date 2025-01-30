@@ -1,6 +1,8 @@
 import os
 from flask import Flask, jsonify
 import yfinance as yf
+from apscheduler.schedulers.background import BackgroundScheduler
+import time
 
 app = Flask(__name__)
 
@@ -44,7 +46,7 @@ def get_stock_data(stock_list):
     for stock in stock_list:
         try:
             ticker = yf.Ticker(stock)
-            data = ticker.history(period="5d")  # Fetch data for the last 6 days
+            data = ticker.history(period="5d")  # Fetch data for the last 5 days
             if not data.empty:
                 # Get the previous close and the most recent closing price
                 previous_close = data['Close'].iloc[-2]  # 2nd last day close
@@ -59,6 +61,16 @@ def get_stock_data(stock_list):
             print(f"Error fetching data for {stock}: {e}")
             stock_data[stock] = {"current_price": None, "previous_close": None, "change": None}
     return stock_data
+
+# Scheduler function to update stock data every 10 seconds
+def update_stock_data():
+    stock_data = get_stock_data(all_stocks)
+    print("Stock data updated:", stock_data)
+
+# Set up the scheduler to run every 10 seconds
+scheduler = BackgroundScheduler()
+scheduler.add_job(update_stock_data, 'interval', seconds=10)
+scheduler.start()
 
 # Endpoint to get the stock data for gainers
 @app.route('/gainers', methods=['GET'])
