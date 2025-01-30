@@ -56,7 +56,7 @@ def get_stock_data(stock_list):
             stock_data[stock] = {"error": "Failed to fetch data"}
     return stock_data
 
-# Background task to update stock data periodically
+# Function to update stock data every 2 minutes
 def update_stock_data():
     global stock_data
     stock_data = get_stock_data(all_stocks)
@@ -64,8 +64,11 @@ def update_stock_data():
 
 # Initialize APScheduler to run the task periodically
 scheduler = BackgroundScheduler()
-scheduler.add_job(update_stock_data, 'interval', seconds=60)
+scheduler.add_job(update_stock_data, 'interval', minutes=2)
 scheduler.start()
+
+# Fetch stock data when the app starts
+update_stock_data()
 
 # Flask route to fetch gainers
 @app.route('/gainers', methods=['GET'])
