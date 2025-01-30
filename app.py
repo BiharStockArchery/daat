@@ -4,7 +4,7 @@ import yfinance as yf
 
 app = Flask(__name__)
 
-# List of all stocks
+# List of all stocks (same as the one you've provided)
 all_stocks = [
     "AXISBANK.NS", "AUBANK.NS", "BANDHANBNK.NS", "BANKBARODA.NS", "BANKINDIA.NS",
     "CANBK.NS", "CUB.NS", "FEDERALBNK.NS", "HDFCBANK.NS", "ICICIBANK.NS",
@@ -44,15 +44,20 @@ def get_stock_data(stock_list):
     for stock in stock_list:
         try:
             ticker = yf.Ticker(stock)
-            data = ticker.history(period="1d")
+            data = ticker.history(period="5d")  # Fetch data for the last 6 days
             if not data.empty:
+                # Get the previous close and the most recent closing price
+                previous_close = data['Close'].iloc[-2]  # 2nd last day close
+                current_price = data['Close'].iloc[-1]  # Most recent close
+                change = ((current_price - previous_close) / previous_close) * 100  # Calculate the percentage change
                 stock_data[stock] = {
-                    "price": data['Close'].iloc[0],
-                    "change": (data['Close'].iloc[0] - data['Open'].iloc[0]) / data['Open'].iloc[0] * 100
+                    "current_price": current_price,
+                    "previous_close": previous_close,
+                    "change": change
                 }
         except Exception as e:
             print(f"Error fetching data for {stock}: {e}")
-            stock_data[stock] = {"price": None, "change": None}
+            stock_data[stock] = {"current_price": None, "previous_close": None, "change": None}
     return stock_data
 
 # Endpoint to get the stock data for gainers
@@ -81,5 +86,3 @@ if __name__ == '__main__':
     # Use the environment variable for the port and bind to 0.0.0.0
     port = int(os.getenv('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
-
-
