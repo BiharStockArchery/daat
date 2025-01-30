@@ -1,8 +1,6 @@
-import os
 from flask import Flask, jsonify
 import yfinance as yf
 from apscheduler.schedulers.background import BackgroundScheduler
-
 
 app = Flask(__name__)
 
@@ -40,61 +38,36 @@ all_stocks = [
     "GMRAIRPORT.NS", "IRCTC.NS", "KEI.NS", "NAVINFLUOR.NS", "POLYCAB.NS", "SUNTV.NS", "UPL.NS"
 ]
 
-# Function to fetch stock data from yfinance
-def get_stock_data(stock_list):
+# Dictionary to store stock data
+stock_data = {}
+
+def fetch_stock_data():
+    """Fetch stock prices from Yahoo Finance"""
+    global stock_data
     stock_data = {}
-    for stock in stock_list:
+
+    for stock in stocks:
         try:
             ticker = yf.Ticker(stock)
-            data = ticker.history(period="5d")  # Fetch data for the last 5 days
-            if not data.empty:
-                # Get the previous close and the most recent closing price
-                previous_close = data['Close'].iloc[-2]  # 2nd last day close
-                current_price = data['Close'].iloc[-1]  # Most recent close
-                change = ((current_price - previous_close) / previous_close) * 100  # Calculate the percentage change
+            hist = ticker.history(period="1d")
+            if not hist.empty:
                 stock_data[stock] = {
-                    "current_price": current_price,
-                    "previous_close": previous_close,
-                    "change": change
+                    "price": round(hist["Close"].iloc[-1], 2),
+                    "volume": int(hist["Volume"].iloc[-1])
                 }
         except Exception as e:
-            print(f"Error fetching data for {stock}: {e}")
-            stock_data[stock] = {"current_price": None, "previous_close": None, "change": None}
-    return stock_data
+            print(f"Error fetching {stock}: {e}")
 
-# Scheduler function to update stock data every 10 seconds
-def update_stock_data():
-    stock_data = get_stock_data(all_stocks)
-    print("Stock data updated:", stock_data)
-
-# Set up the scheduler to run every 10 seconds
+# Scheduler to update stock data every 5 minutes
 scheduler = BackgroundScheduler()
-scheduler.add_job(update_stock_data, 'interval', seconds=10)
+scheduler.add_job(fetch_stock_data, "interval", minutes=5)
 scheduler.start()
 
-# Endpoint to get the stock data for gainers
-@app.route('/gainers', methods=['GET'])
-def get_gainers():
-    try:
-        stock_data = get_stock_data(all_stocks)
-        gainers = {stock: data for stock, data in stock_data.items() if data["change"] > 0}
-        return jsonify(gainers)
-    except Exception as e:
-        print(f"Error fetching gainers data: {e}")
-        return jsonify({"error": "Failed to fetch data"}), 500
-
-# Endpoint to get the stock data for losers
-@app.route('/losers', methods=['GET'])
-def get_losers():
-    try:
-        stock_data = get_stock_data(all_stocks)
-        losers = {stock: data for stock, data in stock_data.items() if data["change"] < 0}
-        return jsonify(losers)
-    except Exception as e:
-        print(f"Error fetching losers data: {e}")
-        return jsonify({"error": "Failed to fetch data"}), 500
+@app.route('/stocks', methods=['GET'])
+def get_stocks():
+    """API endpoint to return stock data"""
+    return jsonify(stock_data)
 
 if __name__ == '__main__':
-    # Use the environment variable for the port and bind to 0.0.0.0
-    port = int(os.getenv('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    fetch_stock_data()  # Initial data fetch
+    app.run(host="0.0.0.0", port=5000, debug=True)
