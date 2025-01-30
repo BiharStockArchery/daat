@@ -1,11 +1,12 @@
 from flask import Flask, jsonify
 import yfinance as yf
 from apscheduler.schedulers.background import BackgroundScheduler
+import threading
 
 app = Flask(__name__)
 
-# List of all stocks (same as the one you've provided)
-all_stocks = [
+# List of stock tickers
+stocks = [
     "AXISBANK.NS", "AUBANK.NS", "BANDHANBNK.NS", "BANKBARODA.NS", "BANKINDIA.NS",
     "CANBK.NS", "CUB.NS", "FEDERALBNK.NS", "HDFCBANK.NS", "ICICIBANK.NS",
     "IDFCFIRSTB.NS", "INDUSINDBK.NS", "KOTAKBANK.NS", "PNB.NS", "RBLBANK.NS",
@@ -38,36 +39,41 @@ all_stocks = [
     "GMRAIRPORT.NS", "IRCTC.NS", "KEI.NS", "NAVINFLUOR.NS", "POLYCAB.NS", "SUNTV.NS", "UPL.NS"
 ]
 
-# Dictionary to store stock data
+# Store stock data
 stock_data = {}
 
 def fetch_stock_data():
-    """Fetch stock prices from Yahoo Finance"""
+    """Fetch stock data and update the global stock_data dictionary."""
     global stock_data
-    stock_data = {}
-
+    print("Fetching stock data...")
+    new_data = {}
+    
     for stock in stocks:
         try:
             ticker = yf.Ticker(stock)
             hist = ticker.history(period="1d")
             if not hist.empty:
-                stock_data[stock] = {
-                    "price": round(hist["Close"].iloc[-1], 2),
-                    "volume": int(hist["Volume"].iloc[-1])
-                }
+                last_close = hist['Close'].iloc[-1]
+                new_data[stock] = {"price": last_close}
         except Exception as e:
             print(f"Error fetching {stock}: {e}")
+    
+    stock_data = new_data  # Update the global stock data
+    print("Stock data updated.")
+
+# Run the fetch function initially
+fetch_stock_data()
 
 # Scheduler to update stock data every 5 minutes
 scheduler = BackgroundScheduler()
 scheduler.add_job(fetch_stock_data, "interval", minutes=5)
 scheduler.start()
 
-@app.route('/stocks', methods=['GET'])
+@app.route("/stocks", methods=["GET"])
 def get_stocks():
-    """API endpoint to return stock data"""
+    """API endpoint to get all stock prices."""
     return jsonify(stock_data)
 
-if __name__ == '__main__':
-    fetch_stock_data()  # Initial data fetch
-    app.run(host="0.0.0.0", port=5000, debug=True)
+if __name__ == "__main__":
+    # Run Flask app with threading enabled
+    app.run(host="0.0.0.0", port=5000, threaded=True)
