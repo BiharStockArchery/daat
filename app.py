@@ -64,7 +64,7 @@ def update_stock_data():
 
 # Initialize APScheduler to run the task periodically
 scheduler = BackgroundScheduler()
-scheduler.add_job(update_stock_data, 'interval', seconds=10)
+scheduler.add_job(update_stock_data, 'interval', seconds=60)
 scheduler.start()
 
 # Flask route to fetch gainers
