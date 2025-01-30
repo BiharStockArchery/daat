@@ -81,6 +81,17 @@ def get_gainers():
         print(f"Error fetching gainers: {e}")
         return jsonify({"error": "Failed to fetch gainers data"}), 500
 
+# Flask route to fetch losers
+@app.route('/losers', methods=['GET'])
+def get_losers():
+    try:
+        # Filter losers (stocks with negative change)
+        losers = {stock: data for stock, data in stock_data.items() if "change" in data and data["change"] < 0}
+        return jsonify(losers)
+    except Exception as e:
+        print(f"Error fetching losers: {e}")
+        return jsonify({"error": "Failed to fetch losers data"}), 500
+
 if __name__ == "__main__":
     # Ensure the app runs on the right host and port for Railway
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)), debug=True)
