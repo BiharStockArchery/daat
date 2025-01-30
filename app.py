@@ -1,12 +1,13 @@
+import os
 from flask import Flask, jsonify
 import yfinance as yf
 from apscheduler.schedulers.background import BackgroundScheduler
-import threading
+from threading import Lock
 
 app = Flask(__name__)
 
-# List of stock tickers
-stocks = [
+# List of all stocks
+all_stocks = [
     "AXISBANK.NS", "AUBANK.NS", "BANDHANBNK.NS", "BANKBARODA.NS", "BANKINDIA.NS",
     "CANBK.NS", "CUB.NS", "FEDERALBNK.NS", "HDFCBANK.NS", "ICICIBANK.NS",
     "IDFCFIRSTB.NS", "INDUSINDBK.NS", "KOTAKBANK.NS", "PNB.NS", "RBLBANK.NS",
@@ -16,64 +17,70 @@ stocks = [
     "MUTHOOTFIN.NS", "PEL.NS", "PFC.NS", "POONAWALLA.NS", "RECLTD.NS", "SBICARD.NS",
     "SBILIFE.NS", "SHRIRAMFIN.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "BPCL.NS",
     "GAIL.NS", "GUJGASLTD.NS", "IGL.NS", "IOC.NS", "MGL.NS", "NTPC.NS", "OIL.NS",
-    "ONGC.NS", "PETRONET.NS", "POWERGRID.NS", "RELIANCE.NS", "SJVN.NS", "TATAPOWER.NS",
-    "ADANIENSOL.NS", "NHPC.NS", "NTPC.NS", "POWERGRID.NS", "SJVN.NS", "TATAPOWER.NS",
-    "ACC.NS", "AMBUJACEM.NS", "DALBHARAT.NS", "JKCEMENT.NS", "RAMCOCEM.NS", "SHREECEM.NS",
-    "ULTRACEMCO.NS", "APLAPOLLO.NS", "HINDALCO.NS", "HINDCOPPER.NS", "JINDALSTEL.NS",
-    "JSWSTEEL.NS", "NATIONALUM.NS", "NMDC.NS", "SAIL.NS", "TATASTEEL.NS", "VEDL.NS",
-    "BSOFT.NS", "COFORGE.NS", "CYIENT.NS", "INFY.NS", "LTIM.NS", "LTTS.NS", "MPHASIS.NS",
-    "PERSISTENT.NS", "TATAELXSI.NS", "TCS.NS", "TECHM.NS", "WIPRO.NS", "ASHOKLEY.NS",
-    "BAJAJ-AUTO.NS", "BHARATFORG.NS", "EICHERMOT.NS", "HEROMOTOCO.NS", "M&M.NS",
-    "MARUTI.NS", "MOTHERSON.NS", "TATAMOTORS.NS", "TVSMOTOR.NS", "ABFRL.NS", "DMART.NS",
-    "NYKAA.NS", "PAGEIND.NS", "PAYTM.NS", "TRENT.NS", "VBL.NS", "ZOMATO.NS", "ASIANPAINT.NS",
-    "BERGEPAINT.NS", "BRITANNIA.NS", "COLPAL.NS", "DABUR.NS", "GODREJCP.NS", "HINDUNILVR.NS",
-    "ITC.NS", "MARICO.NS", "NESTLEIND.NS", "TATACONSUM.NS", "UBL.NS", "UNITEDSPR.NS",
-    "VOLTAS.NS", "ALKEM.NS", "APLLTD.NS", "AUROPHARMA.NS", "BIOCON.NS", "CIPLA.NS",
-    "DIVISLAB.NS", "DRREDDY.NS", "GLENMARK.NS", "GRANULES.NS", "LAURUSLABS.NS", "LUPIN.NS",
-    "SUNPHARMA.NS", "SYNGENE.NS", "TORNTPHARM.NS", "APOLLOHOSP.NS", "LALPATHLAB.NS",
-    "MAXHEALTH.NS", "METROPOLIS.NS", "BHARTIARTL.NS", "HFCL.NS", "IDEA.NS", "INDUSTOWER.NS",
-    "DLF.NS", "GODREJPROP.NS", "LODHA.NS", "OBEROIRLTY.NS", "PRESTIGE.NS", "GUJGASLTD.NS",
-    "IGL.NS", "MGL.NS", "CONCOR.NS", "CESC.NS", "HUDCO.NS", "IRFC.NS", "ABBOTINDIA.NS",
-    "BEL.NS", "CGPOWER.NS", "CUMMINSIND.NS", "HAL.NS", "L&T.NS", "SIEMENS.NS", "TIINDIA.NS",
-    "CHAMBLFERT.NS", "COROMANDEL.NS", "GNFC.NS", "PIIND.NS", "BSE.NS", "DELHIVERY.NS",
-    "GMRAIRPORT.NS", "IRCTC.NS", "KEI.NS", "NAVINFLUOR.NS", "POLYCAB.NS", "SUNTV.NS", "UPL.NS"
+    "ONGC.NS", "PETRONET.NS", "POWERGRID.NS", "RELIANCE.NS", "SJVN.NS", "TATAPOWER.NS"
 ]
 
-# Store stock data
-stock_data = {}
+# Global dictionary to store stock data
+stock_cache = {}
+cache_lock = Lock()
 
+# Function to fetch stock data from yfinance
 def fetch_stock_data():
-    """Fetch stock data and update the global stock_data dictionary."""
-    global stock_data
-    print("Fetching stock data...")
-    new_data = {}
-    
-    for stock in stocks:
-        try:
-            ticker = yf.Ticker(stock)
-            hist = ticker.history(period="1d")
-            if not hist.empty:
-                last_close = hist['Close'].iloc[-1]
-                new_data[stock] = {"price": last_close}
-        except Exception as e:
-            print(f"Error fetching {stock}: {e}")
-    
-    stock_data = new_data  # Update the global stock data
-    print("Stock data updated.")
+    global stock_cache
+    try:
+        # Use yf.download() for better efficiency (fetches all stocks in one request)
+        data = yf.download(all_stocks, period="5d", group_by="ticker")
+        new_stock_cache = {}
 
-# Run the fetch function initially
-fetch_stock_data()
+        for stock in all_stocks:
+            try:
+                if stock in data and not data[stock].empty:
+                    previous_close = data[stock]['Close'].iloc[-2]  # 2nd last day close
+                    current_price = data[stock]['Close'].iloc[-1]  # Most recent close
+                    change = ((current_price - previous_close) / previous_close) * 100  # Percentage change
 
-# Scheduler to update stock data every 5 minutes
+                    new_stock_cache[stock] = {
+                        "current_price": round(current_price, 2),
+                        "previous_close": round(previous_close, 2),
+                        "change": round(change, 2)
+                    }
+            except Exception as e:
+                print(f"Error processing data for {stock}: {e}")
+
+        # Update stock cache with thread safety
+        with cache_lock:
+            stock_cache = new_stock_cache
+        print("Stock data updated.")
+
+    except Exception as e:
+        print(f"Error fetching stock data: {e}")
+
+# Scheduler to update stock data every 10 seconds
 scheduler = BackgroundScheduler()
-scheduler.add_job(fetch_stock_data, "interval", minutes=5)
+scheduler.add_job(fetch_stock_data, 'interval', seconds=10)
 scheduler.start()
 
-@app.route("/stocks", methods=["GET"])
-def get_stocks():
-    """API endpoint to get all stock prices."""
-    return jsonify(stock_data)
+# API endpoint to get gainers
+@app.route('/gainers', methods=['GET'])
+def get_gainers():
+    with cache_lock:
+        gainers = {stock: data for stock, data in stock_cache.items() if data["change"] > 0}
+    return jsonify(gainers)
 
-if __name__ == "__main__":
-    # Run Flask app with threading enabled
-    app.run(host="0.0.0.0", port=5000, threaded=True)
+# API endpoint to get losers
+@app.route('/losers', methods=['GET'])
+def get_losers():
+    with cache_lock:
+        losers = {stock: data for stock, data in stock_cache.items() if data["change"] < 0}
+    return jsonify(losers)
+
+# API endpoint to get all stock data
+@app.route('/stocks', methods=['GET'])
+def get_all_stocks():
+    with cache_lock:
+        return jsonify(stock_cache)
+
+if __name__ == '__main__':
+    # Fetch initial stock data before starting the server
+    fetch_stock_data()
+    app.run(debug=True, use_reloader=False)
