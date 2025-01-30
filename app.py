@@ -2,7 +2,7 @@ import os
 from flask import Flask, jsonify
 import yfinance as yf
 from apscheduler.schedulers.background import BackgroundScheduler
-import time
+
 
 app = Flask(__name__)
 
