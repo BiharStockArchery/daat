@@ -2,6 +2,8 @@ import os
 from flask import Flask, jsonify
 import yfinance as yf
 from apscheduler.schedulers.background import BackgroundScheduler
+from datetime import datetime, timedelta
+import pytz
 
 app = Flask(__name__)
 
@@ -45,12 +47,19 @@ def get_stock_data(stock_list):
     for stock in stock_list:
         try:
             ticker = yf.Ticker(stock)
-            data = ticker.history(period="5d")  # Fetch data for the last 5 days
+            data = ticker.history(period="7d")  # Fetch data for the last 7 days
+
             if not data.empty:
-                # Get the previous close and the most recent closing price
-                previous_close = data['Close'].iloc[-2]  # 2nd last day close
-                current_price = data['Close'].iloc[-1]  # Most recent close
+                # Get the two most recent days of data
+                data = data.tail(2)
+                previous_day = data.iloc[0]
+                current_day = data.iloc[1]
+
+                # Extract previous close and current close
+                previous_close = previous_day['Close']
+                current_price = current_day['Close']
                 change = ((current_price - previous_close) / previous_close) * 100  # Calculate the percentage change
+
                 stock_data[stock] = {
                     "current_price": current_price,
                     "previous_close": previous_close,
@@ -66,7 +75,7 @@ def update_stock_data():
     stock_data = get_stock_data(all_stocks)
     print("Stock data updated:", stock_data)
 
-# Set up the scheduler to run every 10 seconds
+# Set up the scheduler to run every 60 seconds
 scheduler = BackgroundScheduler()
 scheduler.add_job(update_stock_data, 'interval', seconds=60)
 scheduler.start()
@@ -94,6 +103,5 @@ def get_losers():
         return jsonify({"error": "Failed to fetch data"}), 500
 
 if __name__ == '__main__':
-    # Use the environment variable for the port and bind to 0.0.0.0
     port = int(os.getenv('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
