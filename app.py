@@ -13,7 +13,7 @@ all_stocks = [
     "SBIN.NS", "YESBANK.NS", "ABCAPITAL.NS", "ANGELONE.NS", "BAJFINANCE.NS",
     "BAJAJFINSV.NS", "CANFINHOME.NS", "CHOLAFIN.NS", "HDFCAMC.NS", "HDFCLIFE.NS",
     "ICICIGI.NS", "ICICIPRULI.NS", "LICIHSGFIN.NS", "M&MFIN.NS", "MANAPPURAM.NS",
-    "MUTHOOTFIN.NS", "PEL.NS", "PFC.NS", "POONAWALLA.NS", "RECLTD.NS", "SBICARD.NS",
+    "MUTHOOTFIN.NS", "PEL.NS", "PFC.NS", "POONAW ALLA.NS", "RECLTD.NS", "SBICARD.NS",
     "SBILIFE.NS", "SHRIRAMFIN.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "BPCL.NS",
     "GAIL.NS", "GUJGASLTD.NS", "IGL.NS", "IOC.NS", "MGL.NS", "NTPC.NS", "OIL.NS",
     "ONGC.NS", "PETRONET.NS", "POWERGRID.NS", "RELIANCE.NS", "SJVN.NS", "TATAPOWER.NS",
@@ -40,7 +40,7 @@ all_stocks = [
 ]
 
 def get_previous_trading_day():
-    today = pd.Timestamp.today()
+    today = pd.Timestamp .today()
     previous_day = today - pd.offsets.BDay(1)
     return previous_day
 
@@ -57,16 +57,14 @@ def gainers():
             current_price = current_data['Close'].iloc[-1]
             percentage_change = ((current_price - previous_close) / previous_close) * 100
             
-            # Ensure percentage_change is a scalar
             if isinstance(percentage_change, pd.Series):
                 percentage_change = percentage_change.item()
 
-            # Check if the percentage change is positive
             if percentage_change > 0:
                 stock_info[stock] = {
-                    'previous_close': float(previous_close),  # Convert to float
-                    'current_price': float(current_price),    # Convert to float
-                    'percentage_change': float(percentage_change)  # Convert to float
+                    'previous_close': float(previous_close),
+                    'current_price': float(current_price),
+                    'percentage_change': float(percentage_change)
                 }
 
     return jsonify(stock_info)
@@ -84,19 +82,18 @@ def losers():
             current_price = current_data['Close'].iloc[-1]
             percentage_change = ((current_price - previous_close) / previous_close) * 100
             
-            # Ensure percentage_change is a scalar
             if isinstance(percentage_change, pd.Series):
                 percentage_change = percentage_change.item()
 
-            # Check if the percentage change is negative
             if percentage_change < 0:
                 stock_info[stock] = {
-                    'previous_close': float(previous_close),  # Convert to float
-                    'current_price': float(current_price),    # Convert to float
-                    'percentage_change': float(percentage_change)  # Convert to float
+                    'previous_close': float(previous_close),
+                    'current_price': float(current_price),
+                    'percentage_change': float(percentage_change)
                 }
 
     return jsonify(stock_info)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=True)
