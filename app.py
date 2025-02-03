@@ -1,9 +1,7 @@
 import os
 from flask import Flask, jsonify
 import yfinance as yf
-from apscheduler.schedulers.background import BackgroundScheduler
-from datetime import datetime, timedelta
-import pytz
+import pandas as pd
 
 app = Flask(__name__)
 
@@ -19,16 +17,16 @@ all_stocks = [
     "SBILIFE.NS", "SHRIRAMFIN.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "BPCL.NS",
     "GAIL.NS", "GUJGASLTD.NS", "IGL.NS", "IOC.NS", "MGL.NS", "NTPC.NS", "OIL.NS",
     "ONGC.NS", "PETRONET.NS", "POWERGRID.NS", "RELIANCE.NS", "SJVN.NS", "TATAPOWER.NS",
-    "ADANIENSOL.NS", "NHPC.NS", "NTPC.NS", "POWERGRID.NS", "SJVN.NS", "TATAPOWER.NS",
-    "ACC.NS", "AMBUJACEM.NS", "DALBHARAT.NS", "JKCEMENT.NS", "RAMCOCEM.NS", "SHREECEM.NS",
-    "ULTRACEMCO.NS", "APLAPOLLO.NS", "HINDALCO.NS", "HINDCOPPER.NS", "JINDALSTEL.NS",
-    "JSWSTEEL.NS", "NATIONALUM.NS", "NMDC.NS", "SAIL.NS", "TATASTEEL.NS", "VEDL.NS",
-    "BSOFT.NS", "COFORGE.NS", "CYIENT.NS", "INFY.NS", "LTIM.NS", "LTTS.NS", "MPHASIS.NS",
-    "PERSISTENT.NS", "TATAELXSI.NS", "TCS.NS", "TECHM.NS", "WIPRO.NS", "ASHOKLEY.NS",
-    "BAJAJ-AUTO.NS", "BHARATFORG.NS", "EICHERMOT.NS", "HEROMOTOCO.NS", "M&M.NS",
-    "MARUTI.NS", "MOTHERSON.NS", "TATAMOTORS.NS", "TVSMOTOR.NS", "ABFRL.NS", "DMART.NS",
-    "NYKAA.NS", "PAGEIND.NS", "PAYTM.NS", "TRENT.NS", "VBL.NS", "ZOMATO.NS", "ASIANPAINT.NS",
-    "BERGEPAINT.NS", "BRITANNIA.NS", "COLPAL.NS", "DABUR.NS", "GODREJCP.NS", "HINDUNILVR.NS",
+    "ADANIENSOL.NS", "NHPC.NS", "ACC.NS", "AMBUJACEM.NS", "DALBHARAT.NS", "JKCEMENT.NS",
+    "RAMCOCEM.NS", "SHREECEM.NS", "ULTRACEMCO.NS", "APLAPOLLO.NS", "HINDALCO.NS",
+    "HINDCOPPER.NS", "JINDALSTEL.NS", "JSWSTEEL.NS", "NATIONALUM.NS", "NMDC.NS",
+    "SAIL.NS", "TATASTEEL.NS", "VEDL.NS", "BSOFT.NS", "COFORGE.NS", "CYIENT.NS",
+    "INFY.NS", "LTIM.NS", "LTTS.NS", "MPHASIS.NS", "PERSISTENT.NS", "TATAELXSI.NS",
+    "TCS.NS", "TECHM.NS", "WIPRO.NS", "ASHOKLEY.NS", "BAJAJ-AUTO.NS", "BHARATFORG.NS",
+    "EICHERMOT.NS", "HEROMOTOCO.NS", "M&M.NS", "MARUTI.NS", "MOTHERSON.NS",
+    "TATAMOTORS.NS", "TVSMOTOR.NS", "ABFRL.NS", "DMART.NS", "NYKAA.NS", "PAGEIND.NS",
+    "PAYTM.NS", "TRENT.NS", "VBL.NS", "ZOMATO.NS", "ASIANPAINT.NS", "BERGEPAINT.NS",
+    "BRITANNIA.NS", "COLPAL.NS", "DABUR.NS", "GODREJCP.NS", "HINDUNILVR.NS",
     "ITC.NS", "MARICO.NS", "NESTLEIND.NS", "TATACONSUM.NS", "UBL.NS", "UNITEDSPR.NS",
     "VOLTAS.NS", "ALKEM.NS", "APLLTD.NS", "AUROPHARMA.NS", "BIOCON.NS", "CIPLA.NS",
     "DIVISLAB.NS", "DRREDDY.NS", "GLENMARK.NS", "GRANULES.NS", "LAURUSLABS.NS", "LUPIN.NS",
@@ -41,67 +39,64 @@ all_stocks = [
     "GMRAIRPORT.NS", "IRCTC.NS", "KEI.NS", "NAVINFLUOR.NS", "POLYCAB.NS", "SUNTV.NS", "UPL.NS"
 ]
 
-# Function to fetch stock data from yfinance
-def get_stock_data(stock_list):
-    stock_data = {}
-    for stock in stock_list:
-        try:
-            ticker = yf.Ticker(stock)
-            data = ticker.history(period="7d")  # Fetch data for the last 7 days
+def get_previous_trading_day():
+    today = pd.Timestamp.today()
+    previous_day = today - pd.offsets.BDay(1)
+    return previous_day
 
-            if not data.empty:
-                # Get the two most recent days of data
-                data = data.tail(2)
-                previous_day = data.iloc[0]
-                current_day = data.iloc[1]
-
-                # Extract previous close and current close
-                previous_close = previous_day['Close']
-                current_price = current_day['Close']
-                change = ((current_price - previous_close) / previous_close) * 100  # Calculate the percentage change
-
-                stock_data[stock] = {
-                    "current_price": current_price,
-                    "previous_close": previous_close,
-                    "change": change
-                }
-        except Exception as e:
-            print(f"Error fetching data for {stock}: {e}")
-            stock_data[stock] = {"current_price": None, "previous_close": None, "change": None}
-    return stock_data
-
-# Scheduler function to update stock data every 10 seconds
-def update_stock_data():
-    stock_data = get_stock_data(all_stocks)
-    print("Stock data updated:", stock_data)
-
-# Set up the scheduler to run every 60 seconds
-scheduler = BackgroundScheduler()
-scheduler.add_job(update_stock_data, 'interval', seconds=60)
-scheduler.start()
-
-# Endpoint to get the stock data for gainers
 @app.route('/gainers', methods=['GET'])
-def get_gainers():
-    try:
-        stock_data = get_stock_data(all_stocks)
-        gainers = {stock: data for stock, data in stock_data.items() if data["change"] > 0}
-        return jsonify(gainers)
-    except Exception as e:
-        print(f"Error fetching gainers data: {e}")
-        return jsonify({"error": "Failed to fetch data"}), 500
+def gainers():
+    previous_day = get_previous_trading_day()
+    stock_info = {}
 
-# Endpoint to get the stock data for losers
+    for stock in all_stocks:
+        data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
+        if not data.empty:
+            previous_close = data['Close'].iloc[0]
+            current_data = yf.download(stock, period='1d')
+            current_price = current_data['Close'].iloc[-1]
+            percentage_change = ((current_price - previous_close) / previous_close) * 100
+            
+            # Ensure percentage_change is a scalar
+            if isinstance(percentage_change, pd.Series):
+                percentage_change = percentage_change.item()
+
+            # Check if the percentage change is positive
+            if percentage_change > 0:
+                stock_info[stock] = {
+                    'previous_close': float(previous_close),  # Convert to float
+                    'current_price': float(current_price),    # Convert to float
+                    'percentage_change': float(percentage_change)  # Convert to float
+                }
+
+    return jsonify(stock_info)
+
 @app.route('/losers', methods=['GET'])
-def get_losers():
-    try:
-        stock_data = get_stock_data(all_stocks)
-        losers = {stock: data for stock, data in stock_data.items() if data["change"] < 0}
-        return jsonify(losers)
-    except Exception as e:
-        print(f"Error fetching losers data: {e}")
-        return jsonify({"error": "Failed to fetch data"}), 500
+def losers():
+    previous_day = get_previous_trading_day()
+    stock_info = {}
+
+    for stock in all_stocks:
+        data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
+        if not data.empty:
+            previous_close = data['Close'].iloc[0]
+            current_data = yf.download(stock, period='1d')
+            current_price = current_data['Close'].iloc[-1]
+            percentage_change = ((current_price - previous_close) / previous_close) * 100
+            
+            # Ensure percentage_change is a scalar
+            if isinstance(percentage_change, pd.Series):
+                percentage_change = percentage_change.item()
+
+            # Check if the percentage change is negative
+            if percentage_change < 0:
+                stock_info[stock] = {
+                    'previous_close': float(previous_close),  # Convert to float
+                    'current_price': float(current_price),    # Convert to float
+                    'percentage_change': float(percentage_change)  # Convert to float
+                }
+
+    return jsonify(stock_info)
 
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(debug=True)
