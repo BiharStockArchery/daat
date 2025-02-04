@@ -1,6 +1,6 @@
 import os
 from flask import Flask, jsonify
-from flask_cors import CORS  # Import CORS
+from flask_cors import CORS
 import yfinance as yf
 import pandas as pd
 
@@ -10,7 +10,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/gainers": {"origins": "http://localhost:3000"},
                      r"/losers": {"origins": "http://localhost:3000"}})
 
-# List of all stocks (same as the one you've provided)
+# List of all stocks
 all_stocks = [
     "AXISBANK.NS", "AUBANK.NS", "BANDHANBNK.NS", "BANKBARODA.NS", "BANKINDIA.NS",
     "CANBK.NS", "CUB.NS", "FEDERALBNK.NS", "HDFCBANK.NS", "ICICIBANK.NS",
@@ -55,22 +55,21 @@ def gainers():
     stock_info = {}
 
     for stock in all_stocks:
+        # Fetch historical data for the previous trading day
         data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
-        if not data.empty:
+        if not data.empty and 'Close' in data.columns:
             previous_close = data['Close'].iloc[0]
             current_data = yf.download(stock, period='1d')
-            current_price = current_data['Close'].iloc[-1]
-            percentage_change = ((current_price - previous_close) / previous_close) * 100
-            
-            if isinstance(percentage_change, pd.Series):
-                percentage_change = percentage_change.item()
-
-            if percentage_change > 0:
-                stock_info[stock] = {
-                    'previous_close': float(previous_close),
-                    'current_price': float(current_price),
-                    'percentage_change': float(percentage_change)
-                }
+            if not current_data.empty and 'Close' in current_data.columns:
+                current_price = current_data['Close'].iloc[-1]
+                percentage_change = ((current_price - previous_close) / previous_close) * 100
+                
+                if percentage_change > 0:
+                    stock_info[stock] = {
+                        'previous_close': float(previous_close),
+                        'current_price': float(current_price),
+                        'percentage_change': float(percentage_change)
+                    }
 
     return jsonify(stock_info)
 
@@ -80,22 +79,21 @@ def losers():
     stock_info = {}
 
     for stock in all_stocks:
+        # Fetch historical data for the previous trading day
         data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
-        if not data.empty:
+        if not data.empty and 'Close' in data.columns:
             previous_close = data['Close'].iloc[0]
             current_data = yf.download(stock, period='1d')
-            current_price = current_data['Close'].iloc[-1]
-            percentage_change = ((current_price - previous_close) / previous_close) * 100
-            
-            if isinstance(percentage_change, pd.Series):
-                percentage_change = percentage_change.item()
-
-            if percentage_change < 0:
-                stock_info[stock] = {
-                    'previous_close': float(previous_close),
-                    'current_price': float(current_price),
-                    'percentage_change': float(percentage_change)
-                }
+            if not current_data.empty and 'Close' in current_data.columns:
+                current_price = current_data['Close'].iloc[-1]
+                percentage_change = ((current_price - previous_close) / previous_close) * 100
+                
+                if percentage_change < 0:
+                    stock_info[stock] = {
+                        'previous_close': float(previous_close),
+                        'current_price': float(current_price),
+                        'percentage_change': float(percentage_change)
+                    }
 
     return jsonify(stock_info)
 
