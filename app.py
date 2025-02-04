@@ -8,7 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 app = Flask(__name__)
 
 # Enable CORS for all origins
-CORS(app)
+CORS(app, resources={r"/stocks": {"origins": "https://gleaming-lokum-2106f6.netlify.app"}}
 
 # List of all stocks
 all_stocks = [
