@@ -3,12 +3,12 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 import yfinance as yf
 import pandas as pd
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
-# Enable CORS for the specified origin
-CORS(app, resources={r"/gainers": {"origins": "http://localhost:3000"},
-                     r"/losers": {"origins": "http://localhost:3000"}})
+# Enable CORS for all origins
+CORS(app)
 
 # List of all stocks
 all_stocks = [
@@ -18,7 +18,7 @@ all_stocks = [
     "SBIN.NS", "YESBANK.NS", "ABCAPITAL.NS", "ANGELONE.NS", "BAJFINANCE.NS",
     "BAJAJFINSV.NS", "CANFINHOME.NS", "CHOLAFIN.NS", "HDFCAMC.NS", "HDFCLIFE.NS",
     "ICICIGI.NS", "ICICIPRULI.NS", "LICIHSGFIN.NS", "M&MFIN.NS", "MANAPPURAM.NS",
-    "MUTHOOTFIN.NS", "PEL.NS", "PFC.NS", "POONAW ALLA.NS", "RECLTD.NS", "SBICARD.NS",
+    "MUTHOOTFIN.NS", "PEL.NS", "PFC.NS", "POONAWALLA.NS", "RECLTD.NS", "SBICARD.NS",
     "SBILIFE.NS", "SHRIRAMFIN.NS", "ADANIGREEN.NS", "ADANIPORTS.NS", "BPCL.NS",
     "GAIL.NS", "GUJGASLTD.NS", "IGL.NS", "IOC.NS", "MGL.NS", "NTPC.NS", "OIL.NS",
     "ONGC.NS", "PETRONET.NS", "POWERGRID.NS", "RELIANCE.NS", "SJVN.NS", "TATAPOWER.NS",
@@ -49,13 +49,15 @@ def get_previous_trading_day():
     previous_day = today - pd.offsets.BDay(1)
     return previous_day
 
-@app.route('/gainers', methods=['GET'])
-def gainers():
+@app.route('/stocks', methods=['GET'])
+def stocks():
     previous_day = get_previous_trading_day()
-    stock_info = {}
+    stock_info = {
+        "gainers": {},
+        "losers": {}
+    }
 
     for stock in all_stocks:
-        # Fetch historical data for the previous trading day
         data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
         if not data.empty and 'Close' in data.columns:
             previous_close = data['Close'].iloc[0]
@@ -64,39 +66,32 @@ def gainers():
                 current_price = current_data['Close'].iloc[-1]
                 percentage_change = ((current_price - previous_close) / previous_close) * 100
                 
+                if isinstance(percentage_change, pd.Series):
+                    percentage_change = percentage_change.item() if not percentage_change.empty else 0
+
                 if percentage_change > 0:
-                    stock_info[stock] = {
-                        'previous_close': float(previous_close),
+                    stock_info["gainers"][stock] = {
                         'current_price': float(current_price),
-                        'percentage_change': float(percentage_change)
+                        'percentage_change': float(percentage_change),
+                        'previous_close': float(previous_close)
+                    }
+                elif percentage_change < 0:
+                    stock_info["losers"][stock] = {
+                        'current_price': float(current_price),
+                        'percentage_change': float(percentage_change),
+                        'previous_close': float(previous_close)
                     }
 
     return jsonify(stock_info)
 
-@app.route('/losers', methods=['GET'])
-def losers():
-    previous_day = get_previous_trading_day()
-    stock_info = {}
-
-    for stock in all_stocks:
-        # Fetch historical data for the previous trading day
-        data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
-        if not data.empty and 'Close' in data.columns:
-            previous_close = data['Close'].iloc[0]
-            current_data = yf.download(stock, period='1d')
-            if not current_data.empty and 'Close' in current_data.columns:
-                current_price = current_data['Close'].iloc[-1]
-                percentage_change = ((current_price - previous_close) / previous_close) * 100
-                
-                if percentage_change < 0:
-                    stock_info[stock] = {
-                        'previous_close': float(previous_close),
-                        'current_price': float(current_price),
-                        'percentage_change': float(percentage_change)
-                    }
-
-    return jsonify(stock_info)
+def fetch_data():
+    # This function can be used to fetch data every 30 seconds if needed
+    print("Fetching data...")  # Placeholder for actual data fetching logic
 
 if __name__ == '__main__':
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(fetch_data, 'interval', seconds=30)
+    scheduler.start()
+    
     port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    app.run(host='0.0.0.0', port=port, debug=True, threaded=True)
