@@ -8,7 +8,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 app = Flask(__name__)
 
 
-CORS(app, resources={r"/stocks": {"origins": "https://gleaming-lokum-2106f6.netlify.app"}})
+CORS(app, resources={r"/stocks": {"origins": "https://gleaming-lokum-2106f6.netlify.app/home"}})
 # List of all stocks
 all_stocks = [
     "AXISBANK.NS", "AUBANK.NS", "BANDHANBNK.NS", "BANKBARODA.NS", "BANKINDIA.NS",
