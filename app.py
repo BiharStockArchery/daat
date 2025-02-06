@@ -1,4 +1,5 @@
 import os
+import time
 from flask import Flask, jsonify
 from flask_cors import CORS
 import yfinance as yf
@@ -57,45 +58,51 @@ def stocks():
         "losers": {}
     }
 
-    for stock in all_stocks:
-        try:
-            # Fetch previous day's data
-            data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
-            if not data.empty and 'Close' in data.columns:
-                previous_close = data['Close'].iloc[0]
-                # Fetch current day's data
-                current_data = yf.download(stock, period='1d')
-                if not current_data.empty and 'Close' in current_data.columns:
-                    current_price = current_data['Close'].iloc[-1]
-                    percentage_change = ((current_price - previous_close) / previous_close) * 100
-                    
-                    if isinstance(percentage_change, pd.Series):
-                        percentage_change = percentage_change.item() if not percentage_change.empty else 0
+    # Fetch stocks in batches of 3
+    for i in range(0, len(all_stocks), 3):
+        batch = all_stocks[i:i + 3]
+        for stock in batch:
+            try:
+                # Fetch previous day's data
+                data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
+                if not data.empty and 'Close' in data.columns:
+                    previous_close = data['Close'].iloc[0]
+                    # Fetch current day's data
+                    current_data = yf.download(stock, period='1d')
+                    if not current_data.empty and 'Close' in current_data.columns:
+                        current_price = current_data['Close'].iloc[-1]
+                        percentage_change = ((current_price - previous_close) / previous_close) * 100
+                        
+                        if isinstance(percentage_change, pd.Series):
+                            percentage_change = percentage_change.item() if not percentage_change.empty else 0
 
-                    if percentage_change > 0:
-                        stock_info["gainers"][stock] = {
-                            'current_price': float(current_price),
-                            'percentage_change': float(percentage_change),
-                            'previous_close': float(previous_close)
-                        }
-                    elif percentage_change < 0:
-                        stock_info["losers"][stock] = {
-                            'current_price': float(current_price),
-                            'percentage_change': float(percentage_change),
-                            'previous_close': float(previous_close)
-                        }
-        except Exception as e:
-            print(f"Error fetching data for {stock}: {e}")
+                        if percentage_change > 0:
+                            stock_info["gainers"][stock] = {
+                                'current_price': float(current_price),
+                                'percentage_change': float(percentage_change),
+                                'previous_close': float(previous_close)
+                            }
+                        elif percentage_change < 0:
+                            stock_info["losers"][stock] = {
+                                'current_price': float(current_price),
+                                'percentage_change': float(percentage_change),
+                                'previous_close': float(previous_close)
+                            }
+            except Exception as e:
+                print(f"Error fetching data for {stock}: {e}")
+        
+        # Wait for 0.5 seconds between batches
+        time.sleep(0.5)
 
     return jsonify(stock_info)
 
 def fetch_data():
-    # This function can be used to fetch data every 30 seconds if needed
+    # This function can be used to fetch data every 1 minute if needed
     print("Fetching data...")  # Placeholder for actual data fetching logic
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
-    scheduler.add_job(fetch_data, 'interval', seconds=30)
+    scheduler.add_job(fetch_data, 'interval', seconds=60)  # Fetch data every 1 minute
     scheduler.start()
     
     port = int(os.environ.get("PORT", 5000))
