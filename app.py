@@ -7,7 +7,8 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
-CORS(app, resources={r"/stocks": {"origins": "https://gleaming-lokum-2106f6.netlify.app"}})
+# Allow all origins for CORS
+CORS(app)  # This will allow all origins
 
 # List of all stocks
 all_stocks = [
@@ -57,29 +58,34 @@ def stocks():
     }
 
     for stock in all_stocks:
-        data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
-        if not data.empty and 'Close' in data.columns:
-            previous_close = data['Close'].iloc[0]
-            current_data = yf.download(stock, period='1d')
-            if not current_data.empty and 'Close' in current_data.columns:
-                current_price = current_data['Close'].iloc[-1]
-                percentage_change = ((current_price - previous_close) / previous_close) * 100
-                
-                if isinstance(percentage_change, pd.Series):
-                    percentage_change = percentage_change.item() if not percentage_change.empty else 0
+        try:
+            # Fetch previous day's data
+            data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
+            if not data.empty and 'Close' in data.columns:
+                previous_close = data['Close'].iloc[0]
+                # Fetch current day's data
+                current_data = yf.download(stock, period='1d')
+                if not current_data.empty and 'Close' in current_data.columns:
+                    current_price = current_data['Close'].iloc[-1]
+                    percentage_change = ((current_price - previous_close) / previous_close) * 100
+                    
+                    if isinstance(percentage_change, pd.Series):
+                        percentage_change = percentage_change.item() if not percentage_change.empty else 0
 
-                if percentage_change > 0:
-                    stock_info["gainers"][stock] = {
-                        'current_price': float(current_price),
-                        'percentage_change': float(percentage_change),
-                        'previous_close': float(previous_close)
-                    }
-                elif percentage_change < 0:
-                    stock_info["losers"][stock] = {
-                        'current_price': float(current_price),
-                        'percentage_change': float(percentage_change),
-                        'previous_close': float(previous_close)
-                    }
+                    if percentage_change > 0:
+                        stock_info["gainers"][stock] = {
+                            'current_price': float(current_price),
+                            'percentage_change': float(percentage_change),
+                            'previous_close': float(previous_close)
+                        }
+                    elif percentage_change < 0:
+                        stock_info["losers"][stock] = {
+                            'current_price': float(current_price),
+                            'percentage_change': float(percentage_change),
+                            'previous_close': float(previous_close)
+                        }
+        except Exception as e:
+            print(f"Error fetching data for {stock}: {e}")
 
     return jsonify(stock_info)
 
