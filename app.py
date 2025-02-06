@@ -7,7 +7,6 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 app = Flask(__name__)
 
-# Allow all origins for development; restrict in production
 CORS(app, resources={r"/*": {"origins": ["http://localhost:3000", "https://gleaming-lokum-2106f6.netlify.app"]}})
 
 # List of all stocks
@@ -58,41 +57,35 @@ def stocks():
     }
 
     for stock in all_stocks:
-        try:
-            # Fetch previous day's data
-            data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
-            if not data.empty and 'Close' in data.columns:
-                previous_close = data['Close'].iloc[0]
-                # Fetch current day's data
-                current_data = yf.download(stock, period='1d')
-                if not current_data.empty and 'Close' in current_data.columns:
-                    current_price = current_data['Close'].iloc[-1]
-                    percentage_change = ((current_price - previous_close) / previous_close) * 100
-                    
-                    if isinstance(percentage_change, pd.Series):
-                        percentage_change = percentage_change.item() if not percentage_change.empty else 0
+        data = yf.download(stock, start=previous_day, end=previous_day + pd.Timedelta(days=1))
+        if not data.empty and 'Close' in data.columns:
+            previous_close = data['Close'].iloc[0]
+            current_data = yf.download(stock, period='1d')
+            if not current_data.empty and 'Close' in current_data.columns:
+                current_price = current_data['Close'].iloc[-1]
+                percentage_change = ((current_price - previous_close) / previous_close) * 100
+                
+                if isinstance(percentage_change, pd.Series):
+                    percentage_change = percentage_change.item() if not percentage_change.empty else 0
 
-                    if percentage_change > 0:
-                        stock_info["gainers"][stock] = {
-                            'current_price': float(current_price),
-                            'percentage_change': float(percentage_change),
-                            'previous_close': float(previous_close)
-                        }
-                    elif percentage_change < 0:
-                        stock_info["losers"][stock] = {
-                            'current_price': float(current_price),
-                            'percentage_change': float(percentage_change),
-                            'previous_close': float(previous_close)
-                        }
-        except Exception as e:
-            print(f"Error fetching data for {stock}: {e}")
+                if percentage_change > 0:
+                    stock_info["gainers"][stock] = {
+                        'current_price': float(current_price),
+                        'percentage_change': float(percentage_change),
+                        'previous_close': float(previous_close)
+                    }
+                elif percentage_change < 0:
+                    stock_info["losers"][stock] = {
+                        'current_price': float(current_price),
+                        'percentage_change': float(percentage_change),
+                        'previous_close': float(previous_close)
+                    }
 
     return jsonify(stock_info)
 
 def fetch_data():
     # This function can be used to fetch data every 30 seconds if needed
     print("Fetching data...")  # Placeholder for actual data fetching logic
-    # You can implement logic to update your stock data here if needed
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
